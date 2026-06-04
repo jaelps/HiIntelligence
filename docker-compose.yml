@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: hiintelligence-db
+    environment:
+      POSTGRES_DB: hiintelligence
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: SecretPassword123!
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d hiintelligence"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cache:
+    image: redis:7-alpine
+    container_name: hiintelligence-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: hiintelligence-api:latest
+    build:
+      context: ./backend
+      dockerfile: HiIntelligence.Api/Dockerfile
+    container_name: hiintelligence-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=db;Database=hiintelligence;Username=admin;Password=SecretPassword123!
+      - Redis__ConnectionString=cache:6379
+      - JWT__Key=HiIntelligenceSuperSecretKey2026ExtraLongValueForHmacSha256!
+      - JWT__Issuer=HiIntelligenceApi
+      - JWT__Audience=HiIntelligenceClient
+    ports:
+      - "5000:80"
+    depends_on:
+      - db
+      - cache
+    restart: on-failure
+
+  frontend:
+    image: hiintelligence-ui:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hiintelligence-ui
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://api:80
+    depends_on:
+      - api
+    restart: on-failure
+
+volumes:
+  pgdata:
+  redisdata:
