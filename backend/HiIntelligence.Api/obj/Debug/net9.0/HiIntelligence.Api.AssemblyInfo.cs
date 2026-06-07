@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HiIntelligence.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2dd3cda0228637dd427321d6bbb7249f43a6a96e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c50227bdbec7ed2be8bd3a49d281e5d8ac1ef7d6")]
 [assembly: System.Reflection.AssemblyProductAttribute("HiIntelligence.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HiIntelligence.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
