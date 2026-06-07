@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using HiIntelligence.Api.Data;
 using HiIntelligence.Api.Hubs;
 using HiIntelligence.Api.Services;
@@ -13,23 +14,30 @@ builder.Services.AddControllers();
 
 // Configure Database Connection with SQLite Fallback
 var pgConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var sqliteConnectionString = builder.Configuration.GetConnectionString("SQLiteConnection");
+var sqliteConnectionString = builder.Configuration.GetConnectionString("SQLiteConnection") ?? "Data Source=hiintelligence.db";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    // Try to use PostgreSQL. If it fails or we want a local SQLite fallback, we handle it in Program startup.
-    // To make it fully robust for environments without Postgres, we'll try configuring Postgres, 
-    // but we can catch connection issues or check a flag. Or we can check if PG host is localhost and can connect.
-    // Actually, a simpler and cleaner approach for .NET is to read an environment variable or config flag, 
-    // or try Postgres and fall back. Let's make it so if PG host is localhost and can't connect, or if specified, 
-    // it falls back to SQLite.
-    // For extreme robustness, let's check a environment variable or try-catch on startup.
-    // Let's configure PostgreSQL by default, but let's check a environment variable USE_SQLITE.
+    // Try to use PostgreSQL. If it fails or the env var explicitly requests SQLite, fall back to SQLite.
     var useSqlite = Environment.GetEnvironmentVariable("USE_SQLITE") == "true" || string.IsNullOrEmpty(pgConnectionString);
-    
+    if (!useSqlite && !string.IsNullOrEmpty(pgConnectionString))
+    {
+        try
+        {
+            using var pgConnection = new NpgsqlConnection(pgConnectionString);
+            pgConnection.Open();
+            pgConnection.Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Database initialization warning: PostgreSQL is unavailable ({ex.Message}). Falling back to SQLite.");
+            useSqlite = true;
+        }
+    }
+
     if (useSqlite)
     {
-        options.UseSqlite(sqliteConnectionString ?? "Data Source=hiintelligence.db");
+        options.UseSqlite(sqliteConnectionString);
     }
     else
     {

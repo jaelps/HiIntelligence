@@ -13,6 +13,12 @@ Write-Host "=========================================================" -Foregrou
 try {
     $dotnetVer = & "dotnet" --version
     Write-Host "[OK] .NET SDK is installed: $dotnetVer" -ForegroundColor Green
+    $dotnetMajorVersion = [int]($dotnetVer.Split('.')[0])
+    if ($dotnetMajorVersion -lt 9) {
+        Write-Host "[ERROR] .NET SDK version 9.0 or newer is required." -ForegroundColor Red
+        Write-Host "Please install the .NET 9.0 SDK: https://dotnet.microsoft.com/download" -ForegroundColor Yellow
+        exit 1
+    }
 } catch {
     Write-Host "[ERROR] .NET SDK is not installed or not in PATH." -ForegroundColor Red
     Write-Host "Please install the .NET 9.0 SDK: https://dotnet.microsoft.com/download" -ForegroundColor Yellow
@@ -43,30 +49,39 @@ if (-not (Test-Path $FrontendDir)) {
     exit 1
 }
 
+function Check-LastExitCode($message) {
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] $message" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+
+$npmCmd = $null
+foreach ($cmd in @('npm.cmd', 'npm')) {
+    if (Get-Command $cmd -ErrorAction SilentlyContinue) {
+        $npmCmd = $cmd
+        break
+    }
+}
+if (-not $npmCmd) {
+    Write-Host "[ERROR] npm não encontrado no PATH." -ForegroundColor Red
+    exit 1
+}
+
 # Install Frontend dependencies
 Write-Host "`n[1/3] Installing frontend dependencies..." -ForegroundColor Yellow
 Push-Location $FrontendDir
-try {
-    & npm install
-    Write-Host "[OK] Frontend dependencies installed successfully." -ForegroundColor Green
-} catch {
-    Write-Host "[ERROR] Failed to install frontend dependencies." -ForegroundColor Red
-    Pop-Location
-    exit 1
-}
+& $npmCmd install
+Check-LastExitCode "Failed to install frontend dependencies."
+Write-Host "[OK] Frontend dependencies installed successfully." -ForegroundColor Green
 Pop-Location
 
 # Build Backend
 Write-Host "`n[2/3] Building backend project..." -ForegroundColor Yellow
 Push-Location $BackendDir
-try {
-    & dotnet build
-    Write-Host "[OK] Backend build completed successfully." -ForegroundColor Green
-} catch {
-    Write-Host "[ERROR] Backend build failed." -ForegroundColor Red
-    Pop-Location
-    exit 1
-}
+& dotnet build
+Check-LastExitCode "Backend build failed. Ensure .NET 9.0 SDK is installed and available on PATH."
+Write-Host "[OK] Backend build completed successfully." -ForegroundColor Green
 Pop-Location
 
 # Run services
@@ -75,8 +90,8 @@ Write-Host "Starting API on http://localhost:5000" -ForegroundColor Cyan
 Write-Host "Starting Frontend on http://localhost:3000 (or first available port)" -ForegroundColor Cyan
 Write-Host "Press Ctrl+C to terminate both servers." -ForegroundColor Yellow
 
-$apiJob = Start-Process dotnet -ArgumentList "run --project `"$BackendDir`"" -NoNewWindow -PassThru
-$uiJob = Start-Process npm -ArgumentList "run dev" -WorkingDirectory $FrontendDir -NoNewWindow -PassThru
+$apiJob = Start-Process -FilePath "dotnet" -ArgumentList "run","--project",$BackendDir -NoNewWindow -PassThru
+$uiJob = Start-Process -FilePath $npmCmd -ArgumentList "run","dev" -WorkingDirectory $FrontendDir -NoNewWindow -PassThru
 
 # Monitor jobs
 try {
